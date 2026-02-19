@@ -1,10 +1,7 @@
 # Frequência Medicina - FATEC
 
-<<<<<<< HEAD
-Sistema de gestão de frequência para o curso de Medicina, desenvolvido pelo setor de T.I. da FATEC. O objetivo principal deste aplicativo é permitir que os preceptores das Unidades Básicas de Saúde (UBS) realizem o lançamento da frequência dos alunos de forma ágil e segura, utilizando a leitura de QR Codes individuais portados pelos estudantes.
-=======
-Sistema de gestão de frequência para o curso de Medicina, desenvolvido para a FATEC. Este aplicativo permite o gerenciamento de UBSs, preceptores e acompanhamento de frequência de alunos.
->>>>>>> 40118c78a8caf366b4e3b11951e22f8c6decc33e
+
+Sistema de gestão de frequência para o curso de Medicina, desenvolvido para Faculdade de Tecnologia do Vale do Ivaí - (FATEC). O objetivo principal deste aplicativo é permitir que os preceptores das Unidades Básicas de Saúde (UBS) realizem o lançamento da frequência dos alunos de forma ágil e segura, utilizando a leitura de QR Codes individuais portados pelos estudantes.
 
 ## 🚀 Funcionalidades Principais
 
