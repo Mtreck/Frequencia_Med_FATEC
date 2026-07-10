@@ -7,11 +7,12 @@ import {
     ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     TouchableWithoutFeedback,
     useWindowDimensions,
-    View
+    View,
 } from "react-native";
+import { IconButton } from "./IconButton";
+import { colors, radius, shadow, spacing, type } from "./theme";
 
 interface AppModalProps {
     visible: boolean;
@@ -23,38 +24,29 @@ interface AppModalProps {
 
 export function AppModal({ visible, onClose, title, children, footer }: AppModalProps) {
     const { width, height } = useWindowDimensions();
-    const isWebWide = width >= 768; // Helper for web responsiveness
+    const isWide = width >= 640;
 
     return (
-        <Modal
-            visible={visible}
-            animationType="slide"
-            transparent
-            onRequestClose={onClose}
-        >
+        <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
             <TouchableWithoutFeedback onPress={onClose}>
-                <View style={styles.backdrop}>
+                <View style={[styles.backdrop, isWide && styles.backdropWide]}>
                     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                         <KeyboardAvoidingView
                             behavior={Platform.OS === "ios" ? "padding" : "height"}
                             style={[
                                 styles.modalContainer,
-                                isWebWide && styles.modalContainerWeb,
-                                { maxHeight: height * 0.9 } // 90% of screen height
+                                isWide && styles.modalContainerWide,
+                                { maxHeight: height * 0.9 },
                             ]}
                         >
-                            {/* Prevent closing when clicking inside the modal */}
+                            {/* Impede fechar ao clicar dentro do modal */}
                             <TouchableWithoutFeedback>
                                 <View style={styles.innerContent}>
-                                    {/* Header */}
                                     <View style={styles.header}>
                                         <Text style={styles.title}>{title}</Text>
-                                        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                                            <Text style={styles.closeText}>✕</Text>
-                                        </TouchableOpacity>
+                                        <IconButton icon="close" label="Fechar" onPress={onClose} />
                                     </View>
 
-                                    {/* Scrollable Body */}
                                     <ScrollView
                                         style={styles.body}
                                         contentContainerStyle={styles.bodyContent}
@@ -63,12 +55,7 @@ export function AppModal({ visible, onClose, title, children, footer }: AppModal
                                         {children}
                                     </ScrollView>
 
-                                    {/* Fixed Footer */}
-                                    {footer && (
-                                        <View style={styles.footer}>
-                                            {footer}
-                                        </View>
-                                    )}
+                                    {footer && <View style={styles.footer}>{footer}</View>}
                                 </View>
                             </TouchableWithoutFeedback>
                         </KeyboardAvoidingView>
@@ -82,67 +69,54 @@ export function AppModal({ visible, onClose, title, children, footer }: AppModal
 const styles = StyleSheet.create({
     backdrop: {
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "flex-end", // Bottom sheet style on mobile
+        backgroundColor: colors.overlay,
+        justifyContent: "flex-end", // bottom sheet no mobile
         alignItems: "center",
+    },
+    backdropWide: {
+        justifyContent: "center",
+        padding: spacing.xl,
     },
     modalContainer: {
         width: "100%",
-        backgroundColor: "#FFFFFF",
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        backgroundColor: colors.surface,
+        borderTopLeftRadius: radius.lg,
+        borderTopRightRadius: radius.lg,
         overflow: "hidden",
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 10,
+        ...shadow,
     },
-    modalContainerWeb: {
-        width: 600, // Fixed width on large screens
-        marginBottom: "auto", // Center vertically on web
-        marginTop: "auto",
-        borderRadius: 20, // Full rounded corners on web
+    modalContainerWide: {
+        maxWidth: 560,
+        borderRadius: radius.lg,
     },
     innerContent: {
         width: "100%",
-        display: 'flex',
-        flexDirection: 'column',
+        flexDirection: "column",
     },
     header: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        padding: 16,
+        paddingVertical: spacing.md,
+        paddingLeft: spacing.lg,
+        paddingRight: spacing.sm,
         borderBottomWidth: 1,
-        borderBottomColor: "#F1F5F9",
-        backgroundColor: "#FFFFFF",
+        borderBottomColor: colors.divider,
     },
     title: {
-        fontSize: 18,
-        fontWeight: "bold",
-        color: "#0F172A",
+        ...type.sectionTitle,
     },
-    closeBtn: {
-        padding: 8,
-    },
-    closeText: {
-        fontSize: 20,
-        color: "#64748B",
-    },
-    body: {
-        // Removed flex: 1 to allow content to define height
-    },
+    body: {},
     bodyContent: {
-        padding: 16,
+        padding: spacing.lg,
     },
     footer: {
-        padding: 16,
+        padding: spacing.lg,
         borderTopWidth: 1,
-        borderTopColor: "#F1F5F9",
-        backgroundColor: "#F8FAFC",
+        borderTopColor: colors.divider,
+        backgroundColor: colors.bg,
         flexDirection: "row",
         justifyContent: "flex-end",
-        gap: 12,
+        gap: spacing.sm,
     },
 });

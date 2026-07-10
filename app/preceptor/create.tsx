@@ -1,45 +1,54 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import { router, Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Platform, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { logout } from "../../src/components/services/auth";
 import { auth } from "../../src/components/services/firebase";
 import { listUBS } from "../../src/components/services/ubs";
+import { HeaderBrand, HeaderLogout } from "../../src/components/ui/AppHeader";
+import { Button } from "../../src/components/ui/Button";
+import { ScreenContainer } from "../../src/components/ui/ScreenContainer";
+import { notify } from "../../src/components/ui/feedback";
+import { colors, radius, shadow, spacing, touchTarget, type } from "../../src/components/ui/theme";
+import { formatDateBR, todayISO } from "../../src/components/utils/format";
+import { getLastUbsId, setLastUbsId } from "../../src/components/utils/prefs";
 import { slugify } from "../../src/components/utils/slugify";
-
-const COLORS = {
-  primary: "#0E3A5E",
-  white: "#FFFFFF",
-  text: "#0B1220",
-  border: "#E2E8F0",
-  muted: "#64748B",
-  bg: "#FFFFFF",
-  surface: "#F8FAFC",
-};
-
-function todayISO() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
 
 export default function CreatePage() {
   const { width } = useWindowDimensions();
-  const isWebWide = width >= 900;
+  const isWide = width >= 700;
 
-  const [shift, setShift] = useState<"manha" | "tarde">("manha");
+  const [turno, setTurno] = useState<"manha" | "tarde">("manha");
+  const [shift, setShift] = useState<"aula1" | "aula2">("aula1");
   const [ubsList, setUbsList] = useState<any[]>([]);
   const [ubsId, setUbsId] = useState<string>("");
+  const [loadingUbs, setLoadingUbs] = useState(true);
 
   const date = useMemo(() => todayISO(), []);
 
   async function loadUbs() {
-    const data = await listUBS();
-    setUbsList(data);
-    if (!ubsId && data?.length) setUbsId(data[0].id);
+    try {
+      setLoadingUbs(true);
+      const data = await listUBS();
+      setUbsList(data);
+      if (!ubsId && data?.length) {
+        // Restaura a última UBS usada pelo preceptor, se ainda existir
+        const saved = await getLastUbsId();
+        const remembered = saved && data.find((u: any) => u.id === saved);
+        setUbsId(remembered ? saved : data[0].id);
+      }
+    } catch (e: any) {
+      notify("error", e?.message || "Falha ao carregar as UBS.");
+    } finally {
+      setLoadingUbs(false);
+    }
+  }
+
+  function selectUbs(id: string) {
+    setUbsId(id);
+    setLastUbsId(id); // lembra a escolha para as próximas chamadas
   }
 
   useEffect(() => {
@@ -52,12 +61,12 @@ export default function CreatePage() {
 
   function goScan() {
     if (!ubsSelected) return;
-
     router.push({
       pathname: "/preceptor/scan",
       params: {
         date,
         shift,
+        turno,
         ubsName,
         ubsSlug,
         createdBy: auth.currentUser?.uid || "",
@@ -71,93 +80,237 @@ export default function CreatePage() {
   }
 
   return (
-    <>
+    <ScreenContainer scrollable contentContainerStyle={styles.scroll}>
       <Stack.Screen
         options={{
           title: "Criar chamada",
-          headerStyle: { backgroundColor: COLORS.primary },
-          headerTintColor: COLORS.white,
-          headerRight: () => (
-            <TouchableOpacity onPress={handleLogout} style={{ paddingHorizontal: 12 }}>
-              <Text style={{ color: COLORS.white, fontWeight: "900" }}>Sair</Text>
-            </TouchableOpacity>
-          ),
+          headerTitle: () => <HeaderBrand label="Preceptor" />,
+          headerRight: () => <HeaderLogout onPress={handleLogout} />,
         }}
       />
 
-      <View style={styles.page}>
-        <View style={[styles.card, isWebWide && { maxWidth: 520, alignSelf: "center", width: "100%" }]}>
-          <Text style={styles.label}>Data</Text>
-          <Text style={styles.value}>{date}</Text>
+      <View style={[styles.card, isWide && styles.cardWide]}>
+        <Text style={styles.label}>Data</Text>
+        <View style={styles.dateRow}>
+          <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+          <Text style={styles.value}>{formatDateBR(date)}</Text>
+        </View>
 
-          <Text style={styles.label}>Turno</Text>
-          <View style={styles.row}>
-            <TouchableOpacity style={[styles.chip, shift === "manha" && styles.chipActive]} onPress={() => setShift("manha")}>
-              <Text style={[styles.chipText, shift === "manha" && styles.chipTextActive]}>Manhã</Text>
-            </TouchableOpacity>
+        <Text style={[styles.label, styles.labelGap]}>Turno</Text>
+        <View style={styles.segmentRow}>
+          {(
+            [
+              { key: "manha", label: "Manhã", icon: "sunny-outline" },
+              { key: "tarde", label: "Tarde", icon: "partly-sunny-outline" },
+            ] as const
+          ).map((opt) => {
+            const active = turno === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => setTurno(opt.key)}
+                style={({ pressed }) => [
+                  styles.segment,
+                  active && styles.segmentActive,
+                  pressed && !active && styles.segmentPressed,
+                ]}
+              >
+                <Ionicons
+                  name={opt.icon}
+                  size={17}
+                  color={active ? colors.white : colors.body}
+                />
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-            <TouchableOpacity style={[styles.chip, shift === "tarde" && styles.chipActive]} onPress={() => setShift("tarde")}>
-              <Text style={[styles.chipText, shift === "tarde" && styles.chipTextActive]}>Tarde</Text>
-            </TouchableOpacity>
+        <Text style={[styles.label, styles.labelGap]}>Aula</Text>
+        <View style={styles.segmentRow}>
+          {(
+            [
+              { key: "aula1", label: "1ª Aula", icon: "book-outline" },
+              { key: "aula2", label: "2ª Aula", icon: "library-outline" },
+            ] as const
+          ).map((opt) => {
+            const active = shift === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => setShift(opt.key)}
+                style={({ pressed }) => [
+                  styles.segment,
+                  active && styles.segmentActive,
+                  pressed && !active && styles.segmentPressed,
+                ]}
+              >
+                <Ionicons
+                  name={opt.icon}
+                  size={17}
+                  color={active ? colors.white : colors.body}
+                />
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={[styles.label, styles.labelGap]}>UBS</Text>
+        {!loadingUbs && ubsList.length === 0 ? (
+          <View style={styles.noUbsBox}>
+            <Ionicons name="business-outline" size={18} color={colors.muted} />
+            <Text style={styles.noUbsText}>
+              Nenhuma UBS cadastrada. Peça ao coordenador para cadastrar uma UBS.
+            </Text>
           </View>
-
-          <Text style={styles.label}>UBS</Text>
+        ) : (
           <View style={styles.pickerBox}>
             <Picker
               selectedValue={ubsId}
-              onValueChange={(v) => setUbsId(String(v))}
-              style={[
-                { color: COLORS.text },
-                Platform.OS === 'web' && ({
-                  height: 50,
-                  width: '100%',
-                  borderWidth: 0,
-                  backgroundColor: 'transparent',
-                  paddingHorizontal: 10,
-                  outlineStyle: 'none', // Removes the blue focus outline on web
-                } as any)
-              ]}
+              onValueChange={(v) => selectUbs(String(v))}
+              accessibilityLabel="Selecionar UBS"
+              style={styles.picker}
             >
               {ubsList.map((u) => (
                 <Picker.Item key={u.id} label={u.name} value={u.id} />
               ))}
             </Picker>
           </View>
+        )}
 
-          <TouchableOpacity style={[styles.button, !ubsSelected && { opacity: 0.5 }]} onPress={goScan} disabled={!ubsSelected}>
-            <Text style={styles.buttonText}>Iniciar scanner</Text>
-          </TouchableOpacity>
+        <Button
+          title="Iniciar scanner"
+          icon="qr-code-outline"
+          onPress={goScan}
+          disabled={!ubsSelected}
+          style={styles.button}
+        />
 
-          <TouchableOpacity style={{ marginTop: 12 }} onPress={loadUbs}>
-            <Text style={styles.link}>Atualizar UBS</Text>
-          </TouchableOpacity>
-        </View>
+        <Button
+          title="Atualizar lista de UBS"
+          icon="refresh-outline"
+          variant="plain"
+          loading={loadingUbs}
+          onPress={loadUbs}
+          style={styles.refresh}
+        />
       </View>
-    </>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: COLORS.bg, padding: 16 },
-  card: { backgroundColor: COLORS.bg },
-  label: { marginTop: 12, color: COLORS.muted, fontWeight: "800" },
-  value: { fontSize: 18, fontWeight: "900", color: COLORS.text },
-  row: { flexDirection: "row", gap: 10, marginTop: 10 },
-  chip: { borderWidth: 1, borderColor: COLORS.border, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 999 },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  chipText: { fontWeight: "900", color: COLORS.text },
-  chipTextActive: { color: COLORS.white },
-
-  pickerBox: {
-    marginTop: 8,
+  scroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+  },
+  card: {
+    width: "100%",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: COLORS.surface,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    ...shadow,
+  },
+  cardWide: {
+    maxWidth: 520,
+    alignSelf: "center",
   },
 
-  button: { marginTop: 16, backgroundColor: COLORS.primary, padding: 14, borderRadius: 12, alignItems: "center" },
-  buttonText: { color: COLORS.white, fontWeight: "900" },
-  link: { color: COLORS.primary, fontWeight: "900" },
+  label: {
+    ...type.label,
+    marginBottom: spacing.xs + 2,
+  },
+  labelGap: {
+    marginTop: spacing.xl,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  value: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.ink,
+  },
+
+  segmentRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  segment: {
+    flex: 1,
+    minHeight: touchTarget,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  segmentActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  segmentPressed: {
+    backgroundColor: colors.bg,
+  },
+  segmentText: {
+    ...type.button,
+    color: colors.body,
+  },
+  segmentTextActive: {
+    color: colors.white,
+  },
+
+  pickerBox: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    overflow: "hidden",
+    backgroundColor: colors.surface,
+  },
+  picker: {
+    color: colors.ink,
+    minHeight: touchTarget,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    paddingHorizontal: spacing.md,
+  },
+
+  noUbsBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+  },
+  noUbsText: {
+    ...type.meta,
+    flexShrink: 1,
+    lineHeight: 18,
+  },
+
+  button: {
+    marginTop: spacing.xxl,
+  },
+  refresh: {
+    marginTop: spacing.sm,
+  },
 });

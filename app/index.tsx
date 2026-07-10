@@ -27,7 +27,7 @@ export default function Index() {
         }
 
         // ✅ 2) Fallback: se tiver role no Firestore
-        const profile = await getUserProfile(u.uid);
+        const profile: any = await getUserProfile(u.uid);
 
         if (profile?.active === false) {
           setTarget("/login");

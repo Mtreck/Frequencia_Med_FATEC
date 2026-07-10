@@ -1,10 +1,15 @@
+import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { getRollcall } from "../../src/components/services/rollcalls";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const COLORS = { primary: "#0E3A5E", white: "#FFF" };
+import { getRollcall } from "../../src/components/services/rollcalls";
+import { Button } from "../../src/components/ui/Button";
+import { EmptyState } from "../../src/components/ui/EmptyState";
+import { notify } from "../../src/components/ui/feedback";
+import { colors, radius, spacing } from "../../src/components/ui/theme";
 
 function formatDateBRFromISO(dateISO: string) {
   // "2026-02-09" -> "09/02/2026"
@@ -13,16 +18,27 @@ function formatDateBRFromISO(dateISO: string) {
   return `${d}/${m}/${y}`;
 }
 
-function makeBodyRADateBR(ras: string[], dateISO: string) {
+/**
+ * Número da aula para o CSV do Edubox: cada chamada pode ser lançada
+ * uma vez por aula (1ª e 2ª) sem o Edubox acusar duplicidade.
+ * Chamadas antigas: "manha" -> 1, "tarde" -> 2.
+ */
+function aulaNumber(shift: string): "1" | "2" {
+  const s = String(shift || "").toLowerCase();
+  return s === "aula2" || s === "tarde" ? "2" : "1";
+}
+
+function makeBodyRADateBR(ras: string[], dateISO: string, shift: string) {
   const dateBR = formatDateBRFromISO(dateISO);
+  const aula = aulaNumber(shift);
 
   const lines = ras
     .map((ra) => String(ra).trim())
     .filter(Boolean)
-    .map((ra) => `${ra};${dateBR}`);
+    .map((ra) => `${ra};${dateBR};${aula}`);
 
-  // ✅ cabeçalho + dados
-  return ["ra;data", ...lines].join("\r\n") + "\r\n";
+  // cabeçalho + dados
+  return ["ra;data;aula", ...lines].join("\r\n") + "\r\n";
 }
 
 function parseEduboxQrToUrl(data: string): string {
@@ -41,7 +57,7 @@ function parseEduboxQrToUrl(data: string): string {
 }
 
 async function postToEdubox(url: string, bodyText: string) {
-  // ✅ Enviar “raw text” igual Postman (não é form-data, não é json)
+  // Enviar "raw text" igual Postman (não é form-data, não é json)
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -75,7 +91,6 @@ export default function ImportEdubox() {
   const [permission, requestPermission] = useCameraPermissions();
   const [locked, setLocked] = useState(false);
   const [sending, setSending] = useState(false);
-  const [lastResult, setLastResult] = useState<any>(null);
 
   async function onScanned({ data }: any) {
     if (locked || sending) return;
@@ -85,17 +100,15 @@ export default function ImportEdubox() {
       setSending(true);
 
       const url = parseEduboxQrToUrl(String(data || ""));
-      const rollcall = await getRollcall(String(id));
-      const bodyText = makeBodyRADateBR(rollcall.ras || [], rollcall.date);
+      const rollcall: any = await getRollcall(String(id));
+      const bodyText = makeBodyRADateBR(rollcall.ras || [], rollcall.date, rollcall.shift);
 
-      const result = await postToEdubox(url, bodyText);
-      setLastResult(result);
+      await postToEdubox(url, bodyText);
 
-      Alert.alert("Enviado", "Arquivo enviado para o servidor do sistema acadêmico (Edubox).");
-      // ✅ NÃO abre navegador, NÃO salva automaticamente, SÓ envia.
+      notify("success", "Presenças enviadas para o Edubox.");
       router.back();
     } catch (e: any) {
-      Alert.alert("Erro", e?.message || "Falha ao enviar.");
+      notify("error", e?.message || "Falha ao enviar.");
       setLocked(false);
     } finally {
       setSending(false);
@@ -104,72 +117,76 @@ export default function ImportEdubox() {
 
   if (!permission?.granted) {
     return (
-      <View style={styles.center}>
-        <Text style={{ marginBottom: 10 }}>Permita o uso da câmera.</Text>
-        <TouchableOpacity onPress={requestPermission}>
-          <Text style={{ color: COLORS.primary, fontWeight: "900" }}>Permitir câmera</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.permissionContainer}>
+        <EmptyState
+          icon="camera-outline"
+          title="Precisamos da câmera"
+          description="A câmera é usada para escanear o QR code do botão Importar do Edubox."
+        >
+          <Button title="Permitir câmera" icon="camera-outline" onPress={requestPermission} />
+        </EmptyState>
+      </SafeAreaView>
     );
   }
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: "Enviar para Edubox",
-          headerStyle: { backgroundColor: COLORS.primary },
-          headerTintColor: COLORS.white,
-        }}
-      />
+    <View style={styles.container}>
+      <View style={styles.cameraBox}>
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onBarcodeScanned={onScanned}
+        />
 
-      <View style={styles.container}>
-        <View style={styles.cameraBox}>
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-            onBarcodeScanned={onScanned}
-          />
-
-          <View style={styles.overlay}>
-            <Text style={styles.overlayText}>Escaneie o QR do botão “Importar” do Edubox</Text>
-            <Text style={styles.overlayText2}>{sending ? "Enviando..." : "Pronto para escanear"}</Text>
+        <View style={styles.overlay}>
+          {sending ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Ionicons name="qr-code-outline" size={16} color={colors.white} />
+          )}
+          <View style={styles.overlayTexts}>
+            <Text style={styles.overlayText}>
+              Escaneie o QR do botão “Importar” do Edubox
+            </Text>
+            <Text style={styles.overlayStatus}>
+              {sending ? "Enviando presenças..." : "Pronto para escanear"}
+            </Text>
           </View>
         </View>
-
-        {/* Debug opcional (se você quiser ver o retorno antes de voltar, comente o router.back acima) */}
-        {lastResult ? (
-          <View style={styles.debug}>
-            <Text style={styles.debugTitle}>Retorno (debug)</Text>
-            <Text style={styles.debugText}>status: {String(lastResult?.status)}</Text>
-            {!!lastResult?.log && <Text style={styles.debugText}>log: {String(lastResult?.log)}</Text>}
-          </View>
-        ) : null}
-
-
       </View>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  cameraBox: { flex: 1, backgroundColor: "#111827" },
+  container: { flex: 1, backgroundColor: colors.ink },
+  permissionContainer: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    justifyContent: "center",
+  },
+  cameraBox: { flex: 1 },
   overlay: {
     position: "absolute",
-    left: 12,
-    right: 12,
-    bottom: 16,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    padding: 12,
-    borderRadius: 14,
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    padding: spacing.lg,
+    borderRadius: radius.md,
   },
-  overlayText: { color: "#fff", fontWeight: "900", textAlign: "center" },
-  overlayText2: { color: "#fff", marginTop: 8, textAlign: "center" },
-  btn: { backgroundColor: COLORS.primary, padding: 14, margin: 14, borderRadius: 14, alignItems: "center" },
-  btnText: { color: "#fff", fontWeight: "900" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  debug: { marginHorizontal: 14, marginTop: 10, padding: 12, borderRadius: 12, backgroundColor: "#F1F5F9" },
-  debugTitle: { fontWeight: "900", marginBottom: 6 },
-  debugText: { color: "#0B1220" },
+  overlayTexts: { flex: 1 },
+  overlayText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  overlayStatus: {
+    color: "rgba(255, 255, 255, 0.75)",
+    fontSize: 13,
+    marginTop: 2,
+  },
 });

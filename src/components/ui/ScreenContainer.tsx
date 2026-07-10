@@ -1,4 +1,3 @@
-import { StatusBar } from "expo-status-bar";
 import React, { ReactNode } from "react";
 import {
     KeyboardAvoidingView,
@@ -9,6 +8,7 @@ import {
     ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { colors, spacing } from "./theme";
 
 interface ScreenContainerProps {
     children: ReactNode;
@@ -30,8 +30,7 @@ export function ScreenContainer({
     keyboardOffset = 0,
 }: ScreenContainerProps) {
     return (
-        <SafeAreaView style={[styles.container, containerStyle]}>
-            <StatusBar style="auto" />
+        <SafeAreaView style={[styles.container, containerStyle]} edges={["left", "right", "bottom"]}>
             <KeyboardAvoidingView
                 style={styles.keyboardView}
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -46,9 +45,7 @@ export function ScreenContainer({
                         {children}
                     </ScrollView>
                 ) : (
-                    <View style={[styles.staticContent, contentContainerStyle]}>
-                        {children}
-                    </View>
+                    <View style={[styles.staticContent, contentContainerStyle]}>{children}</View>
                 )}
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -58,17 +55,17 @@ export function ScreenContainer({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#FFFFFF", // Default background
+        backgroundColor: colors.bg,
     },
     keyboardView: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
-        padding: 16,
+        padding: spacing.lg,
     },
     staticContent: {
         flex: 1,
-        padding: 16,
+        padding: spacing.lg,
     },
 });

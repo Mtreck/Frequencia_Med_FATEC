@@ -1,253 +1,312 @@
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { deleteRollcall, getRollcall, updateRollcallRAs } from "../../src/components/services/rollcalls";
-
-const COLORS = {
-  primary: "#0E3A5E",
-  white: "#FFFFFF",
-  text: "#0B1220",
-  muted: "#64748B",
-  border: "#E2E8F0",
-  bg: "#FFFFFF",
-  danger: "#EF4444",
-  surface: "#F8FAFC",
-  blue: "#2563EB",
-  green: "#16A34A",
-};
+import { Button } from "../../src/components/ui/Button";
+import { EmptyState } from "../../src/components/ui/EmptyState";
+import { Field } from "../../src/components/ui/Field";
+import { IconButton } from "../../src/components/ui/IconButton";
+import { ScreenContainer } from "../../src/components/ui/ScreenContainer";
+import { Skeleton } from "../../src/components/ui/Skeleton";
+import { TurnoTag } from "../../src/components/ui/TurnoTag";
+import { confirmAction, notify } from "../../src/components/ui/feedback";
+import { colors, radius, shadow, spacing, type } from "../../src/components/ui/theme";
+import { formatDateBR, shiftLabel } from "../../src/components/utils/format";
 
 export default function CoordinatorDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const rollcallId = String(id);
+  const { width } = useWindowDimensions();
+  const isWide = width >= 700;
 
   const [loading, setLoading] = useState(true);
   const [item, setItem] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
   const [newRa, setNewRa] = useState("");
+  const [raError, setRaError] = useState<string | null>(null);
   const [rasDraft, setRasDraft] = useState<string[]>([]);
-  const count = rasDraft.length;
+
+  const hasChanges = useMemo(() => {
+    const original = Array.isArray(item?.ras) ? item.ras : [];
+    if (original.length !== rasDraft.length) return true;
+    return rasDraft.some((ra, i) => ra !== original[i]);
+  }, [item, rasDraft]);
 
   async function load() {
     setLoading(true);
-    const data = await getRollcall(rollcallId);
-    setItem(data);
-    setRasDraft(Array.isArray(data?.ras) ? data.ras : []);
-    setLoading(false);
+    try {
+      const data: any = await getRollcall(rollcallId);
+      setItem(data);
+      setRasDraft(Array.isArray(data?.ras) ? data.ras : []);
+    } catch (e: any) {
+      notify("error", e?.message || "Falha ao carregar a chamada.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     load();
   }, [rollcallId]);
 
-  const filename = useMemo(() => {
-    if (!item) return "";
-    const shift = String(item.shift || "").toLowerCase();
-    const ubs = String(item.ubsName || "ubs").toLowerCase().replace(/\s+/g, "-");
-    return `${item.date}_${shift}_${ubs}.csv`;
-  }, [item]);
-
   function addRa() {
     const ra = newRa.trim();
     if (!ra) return;
     if (rasDraft.includes(ra)) {
-      Alert.alert("Atenção", "RA já está na lista.");
+      setRaError("Este RA já está na lista.");
       return;
     }
     setRasDraft((prev) => [ra, ...prev]);
     setNewRa("");
+    setRaError(null);
   }
 
   function removeRa(ra: string) {
     setRasDraft((prev) => prev.filter((x) => x !== ra));
   }
 
-  function clearAll() {
-    Alert.alert("Confirmar", "Deseja limpar toda a lista?", [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Limpar", style: "destructive", onPress: () => setRasDraft([]) },
-    ]);
+  async function clearAll() {
+    const ok = await confirmAction({
+      title: "Limpar lista",
+      message: "Deseja remover todos os RAs desta chamada?",
+      confirmLabel: "Limpar",
+      destructive: true,
+    });
+    if (ok) setRasDraft([]);
   }
 
   async function saveChanges() {
     try {
+      setSaving(true);
       await updateRollcallRAs(rollcallId, rasDraft);
-      Alert.alert("OK", "Alterações salvas.");
+      notify("success", "Alterações salvas.");
       await load();
     } catch (e: any) {
-      Alert.alert("Erro", e?.message || "Falha ao salvar.");
+      notify("error", e?.message || "Falha ao salvar as alterações.");
+    } finally {
+      setSaving(false);
     }
   }
 
   async function removeRollcall() {
-    const run = async () => {
+    const ok = await confirmAction({
+      title: "Excluir chamada",
+      message: "Tem certeza? Esta ação não pode ser desfeita.",
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
       await deleteRollcall(rollcallId);
+      notify("success", "Chamada excluída.");
       router.replace("/coordinator/list");
-    };
-
-    if (Platform.OS === "web") {
-      const ok = window.confirm("Tem certeza que deseja excluir esta chamada?");
-      if (ok) await run();
-      return;
+    } catch (e: any) {
+      notify("error", e?.message || "Falha ao excluir a chamada.");
     }
-
-    Alert.alert("Excluir chamada", "Tem certeza? Isso não pode ser desfeito.", [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Excluir", style: "destructive", onPress: () => run() },
-    ]);
   }
 
   if (loading || !item) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
-        <Stack.Screen
-          options={{
-            title: "Detalhes",
-            headerStyle: { backgroundColor: COLORS.primary },
-            headerTintColor: COLORS.white,
-          }}
-        />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: COLORS.muted, fontWeight: "800" }}>Carregando...</Text>
+      <ScreenContainer scrollable={false}>
+        <View style={[styles.content, isWide && styles.contentWide]}>
+          <Skeleton height={28} width="55%" />
+          <Skeleton height={16} width="35%" style={{ marginTop: spacing.sm }} />
+          <Skeleton height={120} style={{ marginTop: spacing.xl }} />
         </View>
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: "Detalhes",
-          headerStyle: { backgroundColor: COLORS.primary },
-          headerTintColor: COLORS.white,
-        }}
-      />
-
-      <SafeAreaView style={styles.safe}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-            <Text style={styles.title}>{item.ubsName}</Text>
+    <ScreenContainer scrollable contentContainerStyle={styles.scroll}>
+      <View style={[styles.content, isWide && styles.contentWide]}>
+        {/* Cabeçalho da chamada */}
+        <View style={styles.headerCard}>
+          {item.turno ? <TurnoTag turno={item.turno} style={styles.turnoTag} /> : null}
+          <Text style={styles.title}>{item.ubsName}</Text>
+          <View style={styles.metaRow}>
+            <Ionicons name="calendar-outline" size={15} color={colors.muted} />
             <Text style={styles.meta}>
-              {item.date} • {String(item.shift).toUpperCase()}
+              {formatDateBR(item.date)} · {shiftLabel(item.shift)}
             </Text>
+          </View>
 
-            {/* AÇÕES PRINCIPAIS (MOBILE FRIENDLY) */}
-            <View style={styles.actions}>
-              <TouchableOpacity
-                style={styles.btnPrimary}
-                onPress={() => router.push({ pathname: "/coordinator/import-edubox", params: { id: rollcallId } })}
+          <View style={styles.headerActions}>
+            <Button
+              title="Enviar para o Edubox"
+              icon="qr-code-outline"
+              variant="secondary"
+              small
+              onPress={() =>
+                router.push({ pathname: "/coordinator/import-edubox", params: { id: rollcallId } })
+              }
+            />
+            <Button
+              title="Excluir chamada"
+              icon="trash-outline"
+              variant="danger"
+              small
+              onPress={removeRollcall}
+            />
+          </View>
+        </View>
+
+        {/* Adicionar RA */}
+        <View style={styles.addRow}>
+          <Field
+            placeholder="Adicionar RA manualmente"
+            value={newRa}
+            error={raError}
+            onChangeText={(v) => {
+              setNewRa(v);
+              if (raError) setRaError(null);
+            }}
+            keyboardType="numeric"
+            returnKeyType="done"
+            onSubmitEditing={addRa}
+            containerStyle={{ flex: 1 }}
+          />
+          <Button title="Adicionar" icon="add" variant="secondary" onPress={addRa} />
+        </View>
+
+        {/* Lista de RAs */}
+        <View style={styles.listHeader}>
+          <Text style={styles.sectionTitle}>
+            Alunos presentes{" "}
+            <Text style={styles.countText}>({rasDraft.length})</Text>
+          </Text>
+          {rasDraft.length > 0 && (
+            <Button title="Limpar lista" variant="plain" small onPress={clearAll} />
+          )}
+        </View>
+
+        <View style={styles.box}>
+          {rasDraft.length === 0 ? (
+            <EmptyState
+              icon="people-outline"
+              title="Nenhum RA registrado"
+              description="Adicione um RA manualmente no campo acima."
+            />
+          ) : (
+            rasDraft.map((ra, index) => (
+              <View
+                key={ra}
+                style={[styles.raRow, index === rasDraft.length - 1 && styles.raRowLast]}
               >
-                <Text style={styles.btnText}>Enviar para o Edubox</Text>
-              </TouchableOpacity>
+                <Text style={styles.raText}>{ra}</Text>
+                <IconButton
+                  icon="close-circle-outline"
+                  label={`Remover RA ${ra}`}
+                  color={colors.muted}
+                  onPress={() => removeRa(ra)}
+                />
+              </View>
+            ))
+          )}
+        </View>
 
-              <TouchableOpacity style={styles.btnDangerGhost} onPress={removeRollcall}>
-                <Text style={styles.btnDangerText}>Excluir</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* ADD RA */}
-            <View style={styles.addRow}>
-              <TextInput
-                value={newRa}
-                onChangeText={setNewRa}
-                placeholder="Adicionar RA manualmente"
-                placeholderTextColor={COLORS.muted}
-                style={styles.input}
-                keyboardType="numeric"
-                returnKeyType="done"
-                onSubmitEditing={addRa}
-              />
-              <TouchableOpacity style={styles.btnDark} onPress={addRa}>
-                <Text style={styles.btnText}>Adicionar</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.listHeader}>
-              <Text style={styles.sectionTitle}>RAs ({count})</Text>
-              <TouchableOpacity onPress={clearAll}>
-                <Text style={styles.dangerLink}>Limpar lista</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.box}>
-              <FlatList
-                data={rasDraft}
-                keyExtractor={(x) => x}
-                scrollEnabled={false}
-                renderItem={({ item: ra }) => (
-                  <View style={styles.raRow}>
-                    <Text style={styles.raText}>{ra}</Text>
-                    <TouchableOpacity onPress={() => removeRa(ra)}>
-                      <Text style={styles.blueLink}>Remover</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                ListEmptyComponent={<Text style={{ color: COLORS.muted }}>Nenhum RA registrado.</Text>}
-              />
-            </View>
-
-            <TouchableOpacity style={styles.btnSave} onPress={saveChanges}>
-              <Text style={styles.btnText}>Salvar alterações</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </>
+        <Button
+          title={saving ? "Salvando..." : "Salvar alterações"}
+          icon="checkmark"
+          loading={saving}
+          disabled={!hasChanges}
+          onPress={saveChanges}
+          style={styles.saveButton}
+        />
+      </View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.bg },
-  container: { padding: 14, paddingBottom: 24 },
-  title: { fontSize: 32, fontWeight: "900", color: COLORS.text, marginTop: 6 },
-  meta: { marginTop: 6, color: COLORS.muted, fontWeight: "900", fontSize: 16 },
-  meta2: { marginTop: 6, color: COLORS.muted, fontWeight: "800" },
+  scroll: { paddingBottom: spacing.xxl },
+  content: { width: "100%" },
+  contentWide: { maxWidth: 640, alignSelf: "center" },
 
-  actions: { marginTop: 14, gap: 10 },
-  btnPrimary: { backgroundColor: COLORS.primary, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, alignItems: "center" },
-  btnDangerGhost: { paddingVertical: 10, alignItems: "center" },
-  btnDangerText: { color: COLORS.danger, fontWeight: "900" },
-  btnDark: { backgroundColor: "#0F172A", padding: 14, borderRadius: 12, alignItems: "center", minWidth: 120 },
-  btnSave: { backgroundColor: COLORS.green, padding: 16, borderRadius: 12, alignItems: "center", marginTop: 14 },
-  btnText: { color: COLORS.white, fontWeight: "900" },
-
-  addRow: { marginTop: 14, flexDirection: "row", gap: 10, alignItems: "center" },
-  input: {
-    flex: 1,
+  headerCard: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    padding: 12,
-    color: COLORS.text,
-    backgroundColor: COLORS.white,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    ...shadow,
+  },
+  turnoTag: {
+    marginBottom: spacing.sm,
+  },
+  title: {
+    ...type.screenTitle,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  meta: {
+    ...type.meta,
+    fontSize: 14,
+  },
+  headerActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
 
-  listHeader: { marginTop: 18, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  sectionTitle: { fontSize: 18, fontWeight: "900", color: COLORS.text },
-  dangerLink: { color: COLORS.danger, fontWeight: "900" },
-  blueLink: { color: COLORS.blue, fontWeight: "900" },
+  addRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    alignItems: "flex-start",
+    marginTop: spacing.xl,
+  },
+
+  listHeader: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sectionTitle: {
+    ...type.sectionTitle,
+  },
+  countText: {
+    color: colors.muted,
+    fontWeight: "400",
+  },
 
   box: {
-    marginTop: 10,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    padding: 10,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    overflow: "hidden",
   },
-  raRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#E5E7EB", flexDirection: "row", justifyContent: "space-between" },
-  raText: { fontSize: 22, fontWeight: "900", color: COLORS.text },
+  raRow: {
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  raRowLast: {
+    borderBottomWidth: 0,
+  },
+  raText: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: colors.ink,
+    fontVariant: ["tabular-nums"],
+  },
+
+  saveButton: {
+    marginTop: spacing.xl,
+  },
 });

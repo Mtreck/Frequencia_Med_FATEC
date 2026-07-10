@@ -1,30 +1,50 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { login } from "../src/components/services/auth";
+import { Button } from "../src/components/ui/Button";
+import { Field } from "../src/components/ui/Field";
 import { ScreenContainer } from "../src/components/ui/ScreenContainer";
+import { colors, radius, shadow, spacing, type } from "../src/components/ui/theme";
 
-const COLORS = {
-  primary: "#0E3A5E",
-  white: "#FFFFFF",
-  text: "#0B1220",
-  border: "#E2E8F0",
-  muted: "#64748B",
-  bg: "#FFFFFF",
-};
+function loginErrorMessage(code?: string): string {
+  switch (code) {
+    case "auth/invalid-email":
+      return "E-mail inválido.";
+    case "auth/user-disabled":
+      return "Esta conta foi desativada.";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+      return "E-mail ou senha incorretos.";
+    case "auth/too-many-requests":
+      return "Muitas tentativas. Aguarde alguns minutos e tente de novo.";
+    case "auth/network-request-failed":
+      return "Sem conexão. Verifique sua internet.";
+    default:
+      return "Não foi possível entrar. Tente novamente.";
+  }
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleLogin() {
+    if (!email.trim() || !password) {
+      setError("Informe e-mail e senha.");
+      return;
+    }
     try {
       setLoading(true);
+      setError(null);
       await login(email.trim(), password);
-      router.replace("/"); // ✅ deixa o index decidir a rota
+      router.replace("/"); // o index decide a rota pelo perfil
     } catch (e: any) {
-      Alert.alert("Erro", e?.message || "Falha no login");
+      setError(loginErrorMessage(e?.code));
     } finally {
       setLoading(false);
     }
@@ -33,33 +53,57 @@ export default function LoginPage() {
   return (
     <ScreenContainer scrollable contentContainerStyle={styles.centerContent}>
       <View style={styles.card}>
-        <Image source={require("../assets/images/logoFatec.png")} style={styles.logo} resizeMode="contain" />
+        <Image
+          source={require("../assets/images/logoFatec.png")}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel="Logotipo FATEC"
+        />
 
         <Text style={styles.title}>Frequência Medicina</Text>
-        <Text style={styles.subtitle}>Controle de presença (UBS)</Text>
+        <Text style={styles.subtitle}>Controle de presença nas UBS</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={COLORS.muted}
+        <Field
+          label="E-mail"
+          placeholder="seu@email.com"
           autoCapitalize="none"
+          autoComplete="email"
           keyboardType="email-address"
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(v) => {
+            setEmail(v);
+            if (error) setError(null);
+          }}
+          containerStyle={styles.field}
         />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Senha"
-          placeholderTextColor={COLORS.muted}
+        <Field
+          label="Senha"
+          placeholder="Sua senha"
           secureTextEntry
+          autoComplete="password"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(v) => {
+            setPassword(v);
+            if (error) setError(null);
+          }}
+          onSubmitEditing={handleLogin}
+          containerStyle={styles.field}
         />
 
-        <TouchableOpacity style={[styles.button, loading && { opacity: 0.7 }]} onPress={handleLogin} disabled={loading}>
-          <Text style={styles.buttonText}>{loading ? "Entrando..." : "Entrar"}</Text>
-        </TouchableOpacity>
+        {error ? (
+          <View style={styles.errorBox} accessibilityLiveRegion="polite">
+            <Ionicons name="alert-circle" size={18} color={colors.danger} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        <Button
+          title={loading ? "Entrando..." : "Entrar"}
+          onPress={handleLogin}
+          loading={loading}
+          style={styles.button}
+        />
       </View>
     </ScreenContainer>
   );
@@ -73,15 +117,49 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    maxWidth: 400,
-    backgroundColor: COLORS.bg,
-    borderRadius: 20,
-    padding: 24,
+    maxWidth: 420,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xxl,
+    ...shadow,
   },
-  logo: { width: 140, height: 140, alignSelf: "center", marginBottom: 10 },
-  title: { fontSize: 26, fontWeight: "900", textAlign: "center", color: COLORS.text },
-  subtitle: { marginTop: 4, marginBottom: 18, textAlign: "center", color: COLORS.muted, fontWeight: "700" },
-  input: { borderWidth: 1, borderColor: COLORS.border, padding: 12, borderRadius: 12, marginBottom: 12, color: COLORS.text },
-  button: { backgroundColor: COLORS.primary, padding: 14, borderRadius: 12, alignItems: "center" },
-  buttonText: { color: COLORS.white, fontWeight: "900" },
+  logo: {
+    width: 120,
+    height: 120,
+    alignSelf: "center",
+    marginBottom: spacing.sm,
+  },
+  title: {
+    ...type.screenTitle,
+    textAlign: "center",
+  },
+  subtitle: {
+    ...type.meta,
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: spacing.xs,
+    marginBottom: spacing.xl,
+  },
+  field: {
+    marginBottom: spacing.lg,
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.dangerTint,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  errorText: {
+    ...type.meta,
+    color: colors.danger,
+    flexShrink: 1,
+  },
+  button: {
+    marginTop: spacing.xs,
+  },
 });

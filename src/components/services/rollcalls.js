@@ -14,10 +14,11 @@ import { db } from "./firebase";
 
 const COL = "rollcalls";
 
-export async function createRollcall({ date, shift, ubsName, ubsSlug, createdBy, ras }) {
+export async function createRollcall({ date, shift, turno, ubsName, ubsSlug, createdBy, ras }) {
   const ref = await addDoc(collection(db, COL), {
     date,
-    shift,
+    shift, // aula: "aula1" | "aula2"
+    turno: turno || "", // período interno: "manha" | "tarde" (não vai para o Edubox)
     ubsName,
     ubsSlug,
     createdBy,
