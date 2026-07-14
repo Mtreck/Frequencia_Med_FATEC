@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getRollcall } from "../../src/components/services/rollcalls";
@@ -56,6 +56,23 @@ function parseEduboxQrToUrl(data: string): string {
 }
 
 async function postToEdubox(url: string, bodyText: string) {
+  // Na web, o navegador bloqueia esse POST por CORS (o Edubox não libera
+  // Access-Control-Allow-Origin), então passamos por uma function na Vercel
+  // que faz a chamada server-to-server.
+  if (Platform.OS === "web") {
+    const res = await fetch("https://edubox-proxy-vercel.vercel.app/api/edubox-proxy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, bodyText }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || `Falha ao enviar (${res.status}).`);
+    }
+    return data;
+  }
+
   // Enviar "raw text" igual Postman (não é form-data, não é json)
   const res = await fetch(url, {
     method: "POST",
