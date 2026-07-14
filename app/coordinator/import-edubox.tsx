@@ -37,8 +37,7 @@ function makeBodyRADateBR(ras: string[], dateISO: string, shift: string) {
     .filter(Boolean)
     .map((ra) => `${ra};${dateBR};${aula}`);
 
-  // cabeçalho + dados
-  return ["ra;data;aula", ...lines].join("\r\n") + "\r\n";
+  return lines.join("\r\n") + "\r\n";
 }
 
 function parseEduboxQrToUrl(data: string): string {
