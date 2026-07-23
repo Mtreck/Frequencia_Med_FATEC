@@ -10,6 +10,7 @@ import { Button } from "../../src/components/ui/Button";
 import { EmptyState } from "../../src/components/ui/EmptyState";
 import { notify } from "../../src/components/ui/feedback";
 import { colors, radius, spacing } from "../../src/components/ui/theme";
+import { useAuthGuard } from "../../src/components/utils/useAuthGuard";
 
 function formatDateBRFromISO(dateISO: string) {
   // "2026-02-09" -> "09/02/2026"
@@ -103,6 +104,7 @@ async function postToEdubox(url: string, bodyText: string) {
 }
 
 export default function ImportEdubox() {
+  const { ready } = useAuthGuard("coordinator");
   const { id } = useLocalSearchParams<{ id: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [locked, setLocked] = useState(false);
@@ -129,6 +131,14 @@ export default function ImportEdubox() {
     } finally {
       setSending(false);
     }
+  }
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   if (!permission?.granted) {

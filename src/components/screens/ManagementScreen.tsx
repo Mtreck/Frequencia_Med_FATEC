@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+    ActivityIndicator,
     FlatList,
     Pressable,
     RefreshControl,
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 
 import { logout } from "../services/auth";
+import { useAuthGuard } from "../utils/useAuthGuard";
 import { createPreceptor, deletePreceptor, listPreceptors } from "../services/preceptor";
 import { listRollcalls } from "../services/rollcalls";
 import { createUBS, deleteUBS, listUBS } from "../services/ubs";
@@ -44,6 +46,7 @@ const PERIODS: { key: Period; label: string }[] = [
 
 /** Tela de gestão usada pelo coordenador (/coordinator/list) e pelo admin (/admin). */
 export function ManagementScreen({ title }: ManagementScreenProps) {
+    const { ready } = useAuthGuard("coordinator");
     const { width } = useWindowDimensions();
     const isWide = width >= 900;
 
@@ -255,6 +258,14 @@ export function ManagementScreen({ title }: ManagementScreenProps) {
         } catch (e: any) {
             notify("error", e?.message || "Falha ao excluir o preceptor.");
         }
+    }
+
+    if (!ready) {
+        return (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                <ActivityIndicator />
+            </View>
+        );
     }
 
     return (

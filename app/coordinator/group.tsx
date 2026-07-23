@@ -12,6 +12,7 @@ import { TurnoTag } from "../../src/components/ui/TurnoTag";
 import { notify } from "../../src/components/ui/feedback";
 import { colors, radius, shadow, spacing, type } from "../../src/components/ui/theme";
 import { formatDateBR, shiftLabel } from "../../src/components/utils/format";
+import { useAuthGuard } from "../../src/components/utils/useAuthGuard";
 
 function aulaOrder(shift: string) {
   const s = String(shift || "").toLowerCase();
@@ -20,6 +21,7 @@ function aulaOrder(shift: string) {
 
 /** Chamadas do mesmo dia/UBS lado a lado (1ª e 2ª aula), cada uma com seu envio. */
 export default function RollcallGroup() {
+  const { ready } = useAuthGuard("coordinator");
   const { ids } = useLocalSearchParams<{ ids: string }>();
   const idList = useMemo(() => String(ids || "").split(",").filter(Boolean), [ids]);
   const { width } = useWindowDimensions();
@@ -54,7 +56,7 @@ export default function RollcallGroup() {
 
   const first = items[0];
 
-  if (loading) {
+  if (!ready || loading) {
     return (
       <ScreenContainer scrollable={false}>
         <View style={[styles.content, isWide && styles.contentWide]}>

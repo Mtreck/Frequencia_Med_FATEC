@@ -5,9 +5,6 @@ import { ActivityIndicator, View } from "react-native";
 import { auth } from "../src/components/services/firebase";
 import { getUserProfile } from "../src/components/services/users";
 
-// ✅ UID do coordenador (você passou)
-const COORD_UID = "ZQGqgnsXQTWrPqxUlseq6bqjoiw2";
-
 export default function Index() {
   const [checking, setChecking] = useState(true);
   const [target, setTarget] = useState<string | null>(null);
@@ -20,13 +17,7 @@ export default function Index() {
           return;
         }
 
-        // ✅ 1) Regra principal: se o UID é do coordenador, vai direto
-        if (u.uid === COORD_UID) {
-          setTarget("/coordinator/list");
-          return;
-        }
-
-        // ✅ 2) Fallback: se tiver role no Firestore
+        // Papel decidido sempre pelo Firestore — nunca por UID fixo no código.
         const profile: any = await getUserProfile(u.uid);
 
         if (profile?.active === false) {

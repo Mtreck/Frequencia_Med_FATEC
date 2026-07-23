@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import { Stack, router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { logout } from "../../src/components/services/auth";
 import { auth } from "../../src/components/services/firebase";
@@ -15,8 +15,10 @@ import { colors, radius, shadow, spacing, touchTarget, type } from "../../src/co
 import { formatDateBR, todayISO } from "../../src/components/utils/format";
 import { getLastUbsId, setLastUbsId } from "../../src/components/utils/prefs";
 import { slugify } from "../../src/components/utils/slugify";
+import { useAuthGuard } from "../../src/components/utils/useAuthGuard";
 
 export default function CreatePage() {
+  const { ready } = useAuthGuard();
   const { width } = useWindowDimensions();
   const isWide = width >= 700;
 
@@ -77,6 +79,14 @@ export default function CreatePage() {
   async function handleLogout() {
     await logout();
     router.replace("/login");
+  }
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   return (
