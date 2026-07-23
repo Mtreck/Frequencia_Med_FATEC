@@ -1,6 +1,7 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { browserSessionPersistence, getAuth, setPersistence, signOut } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { Platform } from "react-native";
 
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -17,3 +18,29 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export default app;
+
+const SESSION_FLAG = "authSessionStarted";
+
+/**
+ * No web, a sessão do Firebase Auth por padrão fica salva indefinidamente
+ * (IndexedDB) — fechar o navegador e abrir o link de novo mantinha o login
+ * antigo. Aqui a sessão passa a durar só enquanto a aba/navegador está
+ * aberto, e qualquer sessão herdada de antes dessa mudança é derrubada na
+ * primeira aba nova aberta depois do deploy. As telas devem esperar essa
+ * promise resolver antes de assinar onAuthStateChanged.
+ */
+export const authReadyPromise =
+  Platform.OS === "web" && typeof window !== "undefined" && window.sessionStorage
+    ? (async () => {
+        const isFreshBrowserSession = !window.sessionStorage.getItem(SESSION_FLAG);
+        try {
+          await setPersistence(auth, browserSessionPersistence);
+          if (isFreshBrowserSession) {
+            window.sessionStorage.setItem(SESSION_FLAG, "1");
+            await signOut(auth);
+          }
+        } catch {
+          // se falhar, segue sem migrar — login continua funcionando normalmente
+        }
+      })()
+    : Promise.resolve();
