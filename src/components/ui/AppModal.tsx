@@ -92,6 +92,8 @@ const styles = StyleSheet.create({
     innerContent: {
         width: "100%",
         flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
     },
     header: {
         flexDirection: "row",
@@ -106,7 +108,10 @@ const styles = StyleSheet.create({
     title: {
         ...type.sectionTitle,
     },
-    body: {},
+    body: {
+        flex: 1,
+        minHeight: 0,
+    },
     bodyContent: {
         padding: spacing.lg,
     },
