@@ -146,62 +146,67 @@ export default function ImportEdubox() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["left", "right"]}>
       <View style={styles.cameraBox}>
         <CameraView
           style={StyleSheet.absoluteFill}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
           onBarcodeScanned={onScanned}
         />
+      </View>
 
-        <View style={styles.overlay}>
-          {sending ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <Ionicons name="qr-code-outline" size={16} color={colors.white} />
-          )}
-          <View style={styles.overlayTexts}>
-            <Text style={styles.overlayText}>
-              Escaneie o QR do botão “Importar” do Edubox
-            </Text>
-            <Text style={styles.overlayStatus}>
-              {sending ? "Enviando presenças..." : "Pronto para escanear"}
-            </Text>
-          </View>
+      <View style={styles.statusRow}>
+        {sending ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Ionicons name="qr-code-outline" size={16} color={colors.primary} />
+        )}
+        <View style={styles.statusTexts}>
+          <Text style={styles.statusText}>
+            Escaneie o QR do botão “Importar” do Edubox
+          </Text>
+          <Text style={styles.statusSubtext}>
+            {sending ? "Enviando presenças..." : "Pronto para escanear"}
+          </Text>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.ink },
+  container: { flex: 1, backgroundColor: colors.bg },
   permissionContainer: {
     flex: 1,
     backgroundColor: colors.bg,
     justifyContent: "center",
   },
-  cameraBox: { flex: 1 },
-  overlay: {
-    position: "absolute",
-    left: spacing.lg,
-    right: spacing.lg,
-    bottom: spacing.xl,
+  cameraBox: {
+    height: 320,
+    backgroundColor: colors.ink,
+    borderRadius: radius.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    overflow: "hidden",
+  },
+  statusRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    backgroundColor: "rgba(15, 23, 42, 0.7)",
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
     padding: spacing.lg,
+    backgroundColor: colors.surface,
     borderRadius: radius.md,
   },
-  overlayTexts: { flex: 1 },
-  overlayText: {
-    color: colors.white,
+  statusTexts: { flex: 1 },
+  statusText: {
+    color: colors.ink,
     fontSize: 14,
     fontWeight: "600",
   },
-  overlayStatus: {
-    color: "rgba(255, 255, 255, 0.75)",
+  statusSubtext: {
+    color: colors.muted,
     fontSize: 13,
     marginTop: 2,
   },
