@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { createRollcall } from "../../src/components/services/rollcalls";
@@ -12,8 +12,10 @@ import { IconButton } from "../../src/components/ui/IconButton";
 import { confirmAction, notify } from "../../src/components/ui/feedback";
 import { colors, radius, spacing, type } from "../../src/components/ui/theme";
 import { formatDateBR, shiftLabel } from "../../src/components/utils/format";
+import { useAuthGuard } from "../../src/components/utils/useAuthGuard";
 
 export default function ScanPage() {
+  const { ready } = useAuthGuard();
   const params = useLocalSearchParams();
 
   const date = String(params.date || "");
@@ -83,6 +85,14 @@ export default function ScanPage() {
       destructive: true,
     });
     if (ok) setRas([]);
+  }
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   if (!permission?.granted) {

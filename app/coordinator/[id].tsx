@@ -14,8 +14,10 @@ import { TurnoTag } from "../../src/components/ui/TurnoTag";
 import { confirmAction, notify } from "../../src/components/ui/feedback";
 import { colors, radius, shadow, spacing, type } from "../../src/components/ui/theme";
 import { formatDateBR, shiftLabel } from "../../src/components/utils/format";
+import { useAuthGuard } from "../../src/components/utils/useAuthGuard";
 
 export default function CoordinatorDetail() {
+  const { ready } = useAuthGuard("coordinator");
   const { id } = useLocalSearchParams<{ id: string }>();
   const rollcallId = String(id);
   const { width } = useWindowDimensions();
@@ -108,7 +110,7 @@ export default function CoordinatorDetail() {
     }
   }
 
-  if (loading || !item) {
+  if (!ready || loading || !item) {
     return (
       <ScreenContainer scrollable={false}>
         <View style={[styles.content, isWide && styles.contentWide]}>

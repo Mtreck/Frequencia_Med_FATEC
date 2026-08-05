@@ -2,52 +2,55 @@ import { Redirect } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { auth } from "../src/components/services/firebase";
+import { auth, authReadyPromise } from "../src/components/services/firebase";
 import { getUserProfile } from "../src/components/services/users";
-
-// ✅ UID do coordenador (você passou)
-const COORD_UID = "ZQGqgnsXQTWrPqxUlseq6bqjoiw2";
 
 export default function Index() {
   const [checking, setChecking] = useState(true);
   const [target, setTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      try {
-        if (!u) {
-          setTarget("/login");
-          return;
-        }
+    let active = true;
+    let unsub = () => {};
 
-        // ✅ 1) Regra principal: se o UID é do coordenador, vai direto
-        if (u.uid === COORD_UID) {
-          setTarget("/coordinator/list");
-          return;
-        }
+    // Espera a migração de persistência (sessão antiga derrubada, se for o
+    // caso) antes de checar quem está logado — evita redirecionar pro
+    // coordenador com uma sessão que já devia ter caído.
+    authReadyPromise.then(() => {
+      if (!active) return;
+      unsub = onAuthStateChanged(auth, async (u) => {
+        try {
+          if (!u) {
+            setTarget("/login");
+            return;
+          }
 
-        // ✅ 2) Fallback: se tiver role no Firestore
-        const profile: any = await getUserProfile(u.uid);
+          // Papel decidido sempre pelo Firestore — nunca por UID fixo no código.
+          const profile: any = await getUserProfile(u.uid);
 
-        if (profile?.active === false) {
-          setTarget("/login");
-          return;
-        }
+          if (profile?.active === false) {
+            setTarget("/login");
+            return;
+          }
 
-        if (profile?.role === "coordinator") {
-          setTarget("/coordinator/list");
-        } else {
+          if (profile?.role === "coordinator") {
+            setTarget("/coordinator/list");
+          } else {
+            setTarget("/preceptor/create");
+          }
+        } catch {
+          // se der qualquer erro, manda pro preceptor (não trava)
           setTarget("/preceptor/create");
+        } finally {
+          setChecking(false);
         }
-      } catch {
-        // se der qualquer erro, manda pro preceptor (não trava)
-        setTarget("/preceptor/create");
-      } finally {
-        setChecking(false);
-      }
+      });
     });
 
-    return () => unsub();
+    return () => {
+      active = false;
+      unsub();
+    };
   }, []);
 
   if (checking || !target) {
