@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { deleteRollcall, getRollcall, updateRollcallRAs } from "../../src/components/services/rollcalls";
@@ -35,7 +35,7 @@ export default function CoordinatorDetail() {
     return rasDraft.some((ra, i) => ra !== original[i]);
   }, [item, rasDraft]);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const data: any = await getRollcall(rollcallId);
@@ -46,11 +46,11 @@ export default function CoordinatorDetail() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [rollcallId]);
 
   useEffect(() => {
     load();
-  }, [rollcallId]);
+  }, [load]);
 
   function addRa() {
     const ra = newRa.trim();

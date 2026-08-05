@@ -39,7 +39,7 @@ export default function Index() {
         } else {
           setTarget("/preceptor/create");
         }
-      } catch (e) {
+      } catch {
         // se der qualquer erro, manda pro preceptor (não trava)
         setTarget("/preceptor/create");
       } finally {

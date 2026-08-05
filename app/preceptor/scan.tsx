@@ -32,7 +32,7 @@ export default function ScanPage() {
 
   useEffect(() => {
     if (!permission?.granted) requestPermission();
-  }, [permission]);
+  }, [permission, requestPermission]);
 
   function onBarcodeScanned({ data }: any) {
     if (locked) return;

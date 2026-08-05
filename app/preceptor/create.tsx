@@ -53,6 +53,7 @@ export default function CreatePage() {
 
   useEffect(() => {
     loadUbs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- carregar UBS apenas uma vez, ao montar
   }, []);
 
   const ubsSelected = ubsList.find((u) => u.id === ubsId);
